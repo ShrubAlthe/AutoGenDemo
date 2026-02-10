@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Figma2Code — 多智能体工作流</title>
+  <style>
+    :root {
+      --bg-primary: #0f1117;
+      --bg-secondary: #1a1d27;
+      --bg-card: #232734;
+      --border: #2e3348;
+      --text-primary: #e4e6ef;
+      --text-secondary: #8b8fa3;
+      --accent-blue: #4f8ff7;
+      --accent-green: #34d399;
+      --accent-orange: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #a78bfa;
+      --accent-cyan: #22d3ee;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ============ Header ============ */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .header .status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--text-secondary);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text-secondary);
+    }
+    .status-dot.running { background: var(--accent-green); animation: pulse 1.5s infinite; }
+    .status-dot.waiting { background: var(--accent-orange); animation: pulse 1s infinite; }
+    .status-dot.stopped { background: var(--accent-red); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* ============ Main Layout ============ */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ============ Chat Area ============ */
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .messages {
+      flex: 1; overflow-y: auto; padding: 16px 24px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .messages::-webkit-scrollbar { width: 6px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ============ Message Bubble ============ */
+    .message { display: flex; gap: 12px; max-width: 85%; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .message.tool-msg { opacity: 0.65; max-width: 75%; }
+
+    .avatar {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0; color: #fff;
+    }
+
+    .bubble {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px; min-width: 60px;
+    }
+    .message.user .bubble { background: var(--accent-blue); border-color: var(--accent-blue); }
+    .bubble .agent-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .bubble .content {
+      font-size: 14px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .bubble .content code {
+      background: rgba(255,255,255,0.08);
+      padding: 1px 5px; border-radius: 4px; font-size: 13px;
+    }
+    .bubble .content pre {
+      background: var(--bg-primary); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; margin: 8px 0;
+      overflow-x: auto; font-size: 13px; line-height: 1.5;
+    }
+    .bubble .time {
+      font-size: 11px; color: var(--text-secondary);
+      margin-top: 4px; text-align: right;
+    }
+    .message.user .bubble .time { color: rgba(255,255,255,0.7); }
+
+    /* Collapsible tool content */
+    .tool-toggle {
+      font-size: 12px; color: var(--accent-cyan); cursor: pointer;
+      margin-bottom: 4px; user-select: none;
+    }
+    .tool-toggle:hover { text-decoration: underline; }
+    .tool-body { display: none; }
+    .tool-body.open { display: block; }
+
+    /* Agent colors */
+    .agent-figma_analyzer  { background: var(--accent-blue); }
+    .agent-code_writer     { background: var(--accent-green); }
+    .agent-code_reviewer   { background: var(--accent-orange); }
+    .agent-result_reviewer { background: var(--accent-purple); }
+    .agent-info_gatherer   { background: var(--accent-cyan); }
+    .agent-system          { background: var(--text-secondary); }
+    .agent-user            { background: var(--accent-blue); }
+
+    .name-figma_analyzer  { color: var(--accent-blue); }
+    .name-code_writer     { color: var(--accent-green); }
+    .name-code_reviewer   { color: var(--accent-orange); }
+    .name-result_reviewer { color: var(--accent-purple); }
+    .name-info_gatherer   { color: var(--accent-cyan); }
+    .name-system          { color: var(--text-secondary); }
+
+    /* ============ Input Area ============ */
+    .input-area {
+      padding: 16px 24px; border-top: 1px solid var(--border);
+      background: var(--bg-secondary); flex-shrink: 0;
+    }
+    .input-row { display: flex; gap: 12px; align-items: flex-end; }
+    .input-row textarea {
+      flex: 1; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px; color: var(--text-primary);
+      font-size: 14px; font-family: inherit; resize: none;
+      min-height: 44px; max-height: 120px; outline: none; transition: border-color 0.2s;
+    }
+    .input-row textarea:focus { border-color: var(--accent-blue); }
+    .input-row textarea::placeholder { color: var(--text-secondary); }
+
+    .btn {
+      height: 44px; padding: 0 20px; border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    .btn-primary { background: var(--accent-blue); color: #fff; }
+    .btn-primary:hover { background: #3a7be0; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-success { background: var(--accent-green); color: #fff; }
+    .btn-success:hover { background: #2bb88a; }
+    .btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-danger { background: var(--accent-red); color: #fff; }
+    .btn-danger:hover { background: #d43333; }
+    .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ============ Sidebar ============ */
+    .sidebar {
+      width: 280px; background: var(--bg-secondary);
+      border-left: 1px solid var(--border); padding: 16px;
+      overflow-y: auto; flex-shrink: 0;
+    }
+    .sidebar h3 {
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+    }
+    .sidebar h3:not(:first-child) { margin-top: 20px; }
+
+    .start-form { display: flex; flex-direction: column; gap: 10px; }
+    .start-form input {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; color: var(--text-primary);
+      font-size: 13px; outline: none;
+    }
+    .start-form input:focus { border-color: var(--accent-blue); }
+    .start-form input::placeholder { color: var(--text-secondary); }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    .file-list { display: flex; flex-direction: column; gap: 4px; }
+    .file-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 6px; font-size: 13px;
+      color: var(--text-secondary); text-decoration: none; transition: background 0.15s;
+    }
+    .file-item:hover { background: var(--bg-card); color: var(--text-primary); }
+    .file-icon { font-size: 16px; }
+
+    .agent-legend { display: flex; flex-direction: column; gap: 6px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; flex: 1; color: var(--text-secondary);
+      gap: 12px; padding: 40px; text-align: center;
+    }
+    .empty-state .icon { font-size: 48px; opacity: 0.5; }
+    .empty-state p { font-size: 14px; }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .message { max-width: 95%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Figma2Code  多智能体工作流</h1>
+    <div class="header-right">
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">未启动</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Chat Area -->
+    <div class="chat-area">
+      <div class="messages" id="messages">
+        <div class="empty-state" id="emptyState">
+          <div class="icon">&#129302;</div>
+          <p>在右侧输入 Figma 设计稿链接，点击 "启动工作流" 开始</p>
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="input-row">
+          <textarea id="userInput" placeholder="输入消息... (Enter 发送)" rows="1" disabled></textarea>
+          <button class="btn btn-primary" id="sendBtn" disabled>发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h3>工作流控制</h3>
+      <div class="start-form">
+        <input type="text" id="pcLink" placeholder="PC 端设计稿链接" />
+        <input type="text" id="mobileLink" placeholder="手机端设计稿链接（可选）" />
+        <div class="btn-row">
+          <button class="btn btn-success" id="startBtn">启动</button>
+          <button class="btn btn-danger" id="stopBtn" disabled>停止</button>
+        </div>
+      </div>
+
+      <h3>智能体</h3>
+      <div class="agent-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue)"></div> Figma 分析</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-green)"></div> 代码编写</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-orange)"></div> 代码审核</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-purple)"></div> 结果审核</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-cyan)"></div> 信息获取</div>
+      </div>
+
+      <h3>输出文件</h3>
+      <div class="file-list" id="fileList">
+        <div style="font-size:13px;color:var(--text-secondary);">暂无文件</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // State
+    // ============================================================
+    let ws = null;
+    let isRunning = false;
+    let waitingForInput = false;
+
+    const AGENT_LABELS = {
+      figma_analyzer: 'Figma 分析',
+      code_writer: '代码编写',
+      code_reviewer: '代码审核',
+      result_reviewer: '结果审核',
+      info_gatherer: '信息获取',
+      system: '系统',
+      user: '用户',
+    };
+
+    const AGENT_INITIALS = {
+      figma_analyzer: 'FA',
+      code_writer: 'CW',
+      code_reviewer: 'CR',
+      result_reviewer: 'RR',
+      info_gatherer: 'IG',
+      system: 'SY',
+      user: 'U',
+    };
+
+    // ============================================================
+    // DOM
+    // ============================================================
+    const messagesEl = document.getElementById('messages');
+    const emptyState = document.getElementById('emptyState');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const pcLink = document.getElementById('pcLink');
+    const mobileLink = document.getElementById('mobileLink');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const fileList = document.getElementById('fileList');
+
+    // ============================================================
+    // WebSocket
+    // ============================================================
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+      ws.onopen = () => console.log('[WS] Connected');
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.msg_type === 'status') {
+          updateStatus(msg.running, msg.waiting_for_input);
+          return;
+        }
+
+        if (msg.msg_type === 'input_request') {
+          waitingForInput = true;
+          userInput.disabled = false;
+          sendBtn.disabled = false;
+          userInput.placeholder = msg.content || '请输入回复...';
+          userInput.focus();
+          updateButtonStates();
+        }
+
+        if (msg.msg_type === 'workflow_complete') {
+          updateStatus(false, false);
+        }
+
+        appendMessage(msg);
+        refreshFiles();
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] Disconnected, reconnecting in 2s...');
+        setTimeout(connect, 2000);
+      };
+    }
+
+    // ============================================================
+    // Messages
+    // ============================================================
+    function appendMessage(msg) {
+      emptyState.style.display = 'none';
+
+      const isUser = msg.msg_type === 'user';
+      const isTool = msg.msg_type === 'tool';
+      const source = msg.source || 'system';
+      const agentClass = `agent-${source}`;
+      const nameClass = `name-${source}`;
+      const label = AGENT_LABELS[source] || source;
+      const initials = AGENT_INITIALS[source] || source.substring(0, 2).toUpperCase();
+
+      const time = new Date(msg.timestamp * 1000).toLocaleTimeString('zh-CN', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+
+      let content = escapeHtml(msg.content || '');
+      content = content.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+      content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      const wrapper = document.createElement('div');
+      let classes = 'message';
+      if (isUser) classes += ' user';
+      if (isTool) classes += ' tool-msg';
+      wrapper.className = classes;
+
+      if (isTool) {
+        // Tool messages are collapsible
+        const toolId = 'tool-' + Date.now() + Math.random().toString(36).substr(2, 5);
+        wrapper.innerHTML = `
+          <div class="avatar ${agentClass}">${initials}</div>
+          <div class="bubble">
+            <div class="agent-name ${nameClass}">${label}</div>
+            <div class="tool-toggle" onclick="document.getElementById('${toolId}').classList.toggle('open')">
+              [工具调用] 点击展开/收起
+            </div>
+            <div class="tool-body" id="${toolId}">
+              <div class="content">${content}</div>
+            </div>
+            <div class="time">${time}</div>
+          </div>
+        `;
+      } else {
+        wrapper.innerHTML = `
+          <div class="avatar ${agentClass}">${initials}</div>
+          <div class="bubble">
+            ${!isUser ? `<div class="agent-name ${nameClass}">${label}</div>` : ''}
+            <div class="content">${content}</div>
+            <div class="time">${time}</div>
+          </div>
+        `;
+      }
+
+      messagesEl.appendChild(wrapper);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ============================================================
+    // Status
+    // ============================================================
+    function updateStatus(running, waiting) {
+      isRunning = running;
+      waitingForInput = waiting;
+
+      if (running) {
+        statusDot.className = 'status-dot' + (waiting ? ' waiting' : ' running');
+        statusText.textContent = waiting ? '等待输入' : '运行中';
+      } else {
+        statusDot.className = 'status-dot';
+        statusText.textContent = '未运行';
+      }
+
+      updateButtonStates();
+    }
+
+    function updateButtonStates() {
+      startBtn.disabled = isRunning;
+      stopBtn.disabled = !isRunning;
+      pcLink.disabled = isRunning;
+      mobileLink.disabled = isRunning;
+
+      if (!waitingForInput && isRunning) {
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+      }
+    }
+
+    // ============================================================
+    // File List
+    // ============================================================
+    async function refreshFiles() {
+      try {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+        if (data.files.length === 0) {
+          fileList.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">暂无文件</div>';
+          return;
+        }
+        fileList.innerHTML = data.files.map(f => {
+          const ext = f.split('.').pop().toLowerCase();
+          let icon = '&#128462;';
+          if (ext === 'html') icon = '&#128196;';
+          else if (ext === 'css') icon = '&#127912;';
+          else if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)) icon = '&#128248;';
+          else if (ext === 'js') icon = '&#9881;';
+          return `<a class="file-item" href="/output/${f}" target="_blank"><span class="file-icon">${icon}</span>${f}</a>`;
+        }).join('');
+      } catch (e) { /* ignore */ }
+    }
+
+    // ============================================================
+    // Actions
+    // ============================================================
+    startBtn.addEventListener('click', () => {
+      const pc = pcLink.value.trim();
+      if (!pc) { pcLink.focus(); return; }
+
+      ws.send(JSON.stringify({
+        type: 'start',
+        pc_link: pc,
+        mobile_link: mobileLink.value.trim() || null,
+      }));
+
+      updateStatus(true, false);
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (ws && isRunning) {
+        ws.send(JSON.stringify({ type: 'stop' }));
+        stopBtn.disabled = true;
+      }
+    });
+
+    function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text || !ws) return;
+
+      ws.send(JSON.stringify({ type: 'input', text: text }));
+      userInput.value = '';
+      userInput.disabled = true;
+      sendBtn.disabled = true;
+      waitingForInput = false;
+      userInput.placeholder = '输入消息... (Enter 发送)';
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    userInput.addEventListener('input', () => {
+      userInput.style.height = 'auto';
+      userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+    });
+
+    // ============================================================
+    // Init
+    // ============================================================
+    connect();
+    refreshFiles();
+    setInterval(refreshFiles, 5000);
+  </script>
+</body>
+</html>

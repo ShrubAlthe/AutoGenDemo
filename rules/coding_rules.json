@@ -1,0 +1,29 @@
+{
+  "html_rules": [
+    "使用语义化标签：header, nav, main, section, article, footer",
+    "表单元素必须关联 label",
+    "链接必须有明确的文本内容或 aria-label",
+    "避免嵌套超过 5 层的 div",
+    "使用 <!DOCTYPE html> 声明",
+    "必须设置 lang 属性"
+  ],
+  "css_rules": [
+    "优先使用 Flexbox 或 Grid 布局",
+    "避免使用 !important",
+    "媒体查询断点：768px（平板）、1024px（PC）",
+    "字体大小使用 rem 单位",
+    "间距使用 CSS 变量统一管理",
+    "选择器嵌套不超过 3 层"
+  ],
+  "naming_rules": [
+    "CSS 类名使用小写连字符格式（如 .page-header）",
+    "文件名使用小写连字符格式（如 page-header.css）",
+    "CSS 变量使用 --prefix-name 格式"
+  ],
+  "performance_rules": [
+    "避免使用通配符选择器 *",
+    "减少重绘和回流：避免频繁修改样式",
+    "图片使用适当的格式和尺寸",
+    "CSS 文件应在 head 中引入"
+  ]
+}

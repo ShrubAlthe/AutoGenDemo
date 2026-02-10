@@ -1,0 +1,18 @@
+# 环境变量（包含密钥）
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# 输出文件（可选，取消注释则不提交生成的代码）
+# output/

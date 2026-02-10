@@ -1,0 +1,55 @@
+{
+  "css_classes": [
+    {
+      "name": "container",
+      "description": "通用容器类，使用 max-width 和 margin: 0 auto 居中",
+      "code": ".container { max-width: 1200px; margin: 0 auto; padding: 0 15px; box-sizing: border-box; }"
+    },
+    {
+      "name": "flex-center",
+      "description": "Flex 水平垂直居中布局",
+      "code": ".flex-center { display: flex; justify-content: center; align-items: center; }"
+    },
+    {
+      "name": "flex-between",
+      "description": "Flex 两端对齐布局",
+      "code": ".flex-between { display: flex; justify-content: space-between; align-items: center; }"
+    },
+    {
+      "name": "text-ellipsis",
+      "description": "单行文本溢出省略号",
+      "code": ".text-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }"
+    }
+  ],
+  "layout_patterns": [
+    {
+      "name": "响应式两栏布局",
+      "description": "PC端两栏，移动端单栏",
+      "code": ".two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }"
+    },
+    {
+      "name": "圣杯布局",
+      "description": "经典三栏布局：header + (sidebar + main + aside) + footer",
+      "code": ".holy-grail { display: grid; grid-template: 'header header header' auto 'sidebar main aside' 1fr 'footer footer footer' auto / 200px 1fr 200px; min-height: 100vh; }"
+    },
+    {
+      "name": "粘性底部",
+      "description": "footer 始终在页面底部",
+      "code": ".page-wrapper { display: flex; flex-direction: column; min-height: 100vh; } .page-wrapper main { flex: 1; }"
+    }
+  ],
+  "coding_tips": [
+    {
+      "tip": "使用 CSS 变量管理主题色，便于统一修改",
+      "example": ":root { --primary-color: #007bff; --text-color: #333; --bg-color: #fff; --spacing-unit: 8px; }"
+    },
+    {
+      "tip": "移动端优先的媒体查询策略：先写移动端样式，再用 min-width 适配大屏",
+      "example": ".card { padding: 12px; } @media (min-width: 768px) { .card { padding: 24px; } }"
+    },
+    {
+      "tip": "使用 rem 单位配合根字体大小实现整体缩放",
+      "example": "html { font-size: 16px; } h1 { font-size: 2rem; } p { font-size: 1rem; }"
+    }
+  ]
+}
