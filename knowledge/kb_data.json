@@ -36,6 +36,11 @@
       "name": "粘性底部",
       "description": "footer 始终在页面底部",
       "code": ".page-wrapper { display: flex; flex-direction: column; min-height: 100vh; } .page-wrapper main { flex: 1; }"
+    },
+    {
+      "name": "Flex 响应式布局",
+      "description": "使用 Flex 布局实现响应式设计，适用于不同屏幕尺寸的布局调整。",
+      "code": ".container {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 16px;\n  padding: 24px;\n}\n\n@media (min-width: 768px) {\n  .container {\n    flex-direction: row;\n    gap: 32px;\n    padding: 48px;\n  }\n}"
     }
   ],
   "coding_tips": [
