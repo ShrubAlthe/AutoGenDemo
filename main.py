@@ -17,6 +17,7 @@ import json
 import logging
 import sys
 import os
+from contextlib import asynccontextmanager
 
 # 将项目根目录添加到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +43,7 @@ async def run_cli(args: list[str]) -> None:
     from utils.input_parser import parse_args
     from config.model_client import create_model_client
     from workflow.orchestrator import run_workflow
+    from tools.mcp_manager import McpManager
 
     try:
         design_input = parse_args(args)
@@ -63,12 +65,13 @@ async def run_cli(args: list[str]) -> None:
     print("=" * 60)
 
     model_client = create_model_client()
-    try:
-        await run_workflow(design_input, model_client)
-    except KeyboardInterrupt:
-        print("\n\n[中断] 用户取消了工作流。")
-    finally:
-        await model_client.close()
+    async with McpManager() as mcp_mgr:
+        try:
+            await run_workflow(design_input, model_client, mcp_mgr)
+        except KeyboardInterrupt:
+            print("\n\n[中断] 用户取消了工作流。")
+        finally:
+            await model_client.close()
 
 
 # ============================================================
@@ -82,9 +85,13 @@ def run_web(port: int = 8000) -> None:
     from config.model_client import create_model_client
     from workflow.orchestrator import run_workflow_web
     from utils.input_parser import DesignInput
+    from tools.mcp_manager import McpManager
 
     # 确保 output 目录存在
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+
+    # 应用级 MCP 管理器（整个服务期间复用）
+    mcp_mgr = McpManager()
 
     async def workflow_listener():
         """后台任务：监听 Web UI 发来的启动信号并运行工作流。"""
@@ -111,11 +118,11 @@ def run_web(port: int = 8000) -> None:
             bridge.reset_cancel()
             await bridge.emit("system", f"工作流启动: PC={pc_link}", msg_type="system")
 
-            model_client = create_model_client()
+            model_client = create_model_client(on_token=bridge.emit_chunk)
             try:
                 # 将工作流包装为 task 以便取消
                 task = asyncio.create_task(
-                    run_workflow_web(design_input, model_client, bridge)
+                    run_workflow_web(design_input, model_client, mcp_mgr, bridge)
                 )
                 bridge._workflow_task = task
                 await task
@@ -131,9 +138,19 @@ def run_web(port: int = 8000) -> None:
                 # 通知前端工作流结束
                 await bridge._emit_status()
 
-    @app.on_event("startup")
-    async def startup():
-        asyncio.create_task(workflow_listener())
+    # 使用 FastAPI lifespan 替代弃用的 on_event
+    @asynccontextmanager
+    async def lifespan(app):
+        # 启动时
+        listener_task = asyncio.create_task(workflow_listener())
+        print("[启动] 工作流监听器已启动")
+        yield
+        # 关闭时
+        listener_task.cancel()
+        await mcp_mgr.close()
+        print("[关闭] MCP 连接已释放")
+
+    app.router.lifespan_context = lifespan
 
     print()
     print("=" * 60)

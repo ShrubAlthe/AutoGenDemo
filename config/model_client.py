@@ -6,7 +6,7 @@
 """
 import asyncio
 import time
-from typing import Any, AsyncGenerator, Literal, Mapping, Optional, Sequence, Union
+from typing import Any, AsyncGenerator, Callable, Literal, Mapping, Optional, Sequence, Union
 
 from pydantic import BaseModel
 
@@ -50,6 +50,7 @@ class FallbackChatCompletionClient(ChatCompletionClient):
         model_names: list[str],
         cooldown_seconds: float = 60,
         retry_wait_seconds: float = 10,
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> None:
         if not clients:
             raise ValueError("至少需要一个模型客户端")
@@ -58,6 +59,7 @@ class FallbackChatCompletionClient(ChatCompletionClient):
         self._model_names = model_names
         self._cooldown_seconds = cooldown_seconds
         self._retry_wait_seconds = retry_wait_seconds
+        self._on_token = on_token
 
         # 当前优先使用的模型索引
         self._current_index: int = 0
@@ -137,7 +139,7 @@ class FallbackChatCompletionClient(ChatCompletionClient):
     # create_stream（带回退逻辑）
     # ------------------------------------------------------------------
 
-    def create_stream(
+    async def create_stream(
         self,
         messages: Sequence[LLMMessage],
         *,
@@ -147,8 +149,8 @@ class FallbackChatCompletionClient(ChatCompletionClient):
         extra_create_args: Mapping[str, Any] = {},
         cancellation_token: Optional[CancellationToken] = None,
     ) -> AsyncGenerator[Union[str, CreateResult], None]:
-        """流式调用当前活跃模型。"""
-        return self._clients[self._current_index].create_stream(
+        """流式调用当前活跃模型，拦截 token chunk 并通过回调通知。"""
+        stream = self._clients[self._current_index].create_stream(
             messages,
             tools=tools,
             tool_choice=tool_choice,
@@ -156,6 +158,14 @@ class FallbackChatCompletionClient(ChatCompletionClient):
             extra_create_args=extra_create_args,
             cancellation_token=cancellation_token,
         )
+        async for chunk in stream:
+            # str chunk 是单个 token，CreateResult 是最终结果
+            if isinstance(chunk, str) and self._on_token:
+                try:
+                    self._on_token(chunk)
+                except Exception:
+                    pass  # 回调异常不应中断生成
+            yield chunk
 
     # ------------------------------------------------------------------
     # 委托方法：转发到当前活跃客户端
@@ -258,8 +268,13 @@ class FallbackChatCompletionClient(ChatCompletionClient):
 # ============================================================
 
 
-def create_model_client() -> FallbackChatCompletionClient:
+def create_model_client(
+    on_token: Optional[Callable[[str], None]] = None,
+) -> FallbackChatCompletionClient:
     """根据 MODEL_FALLBACK_CHAIN 配置创建带自动回退的模型客户端。
+
+    Args:
+        on_token: 可选回调，每生成一个 token 时调用，用于流式推送到前端。
 
     Returns:
         FallbackChatCompletionClient 实例（兼容 ChatCompletionClient 接口）
@@ -294,4 +309,5 @@ def create_model_client() -> FallbackChatCompletionClient:
         model_names=model_names,
         cooldown_seconds=settings.MODEL_COOLDOWN_SECONDS,
         retry_wait_seconds=settings.MODEL_RETRY_WAIT_SECONDS,
+        on_token=on_token,
     )

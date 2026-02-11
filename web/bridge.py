@@ -63,6 +63,23 @@ class WorkflowBridge:
         for sub_queue in self._subscribers:
             await sub_queue.put(msg)
 
+    def emit_chunk(self, token: str) -> None:
+        """同步推送 token chunk 到所有订阅者（用于 model_client 的 on_token 回调）。
+
+        不记录到 messages 历史（完整消息会由 agent 消息覆盖）。
+        """
+        chunk_msg = {
+            "source": "assistant",
+            "content": token,
+            "timestamp": time.time(),
+            "msg_type": "chunk",
+        }
+        for sub_queue in self._subscribers:
+            try:
+                sub_queue.put_nowait(chunk_msg)
+            except Exception:
+                pass  # 队列满时丢弃 chunk，不影响主流程
+
     # ------------------------------------------------------------------
     # Web UI → 编排器
     # ------------------------------------------------------------------
