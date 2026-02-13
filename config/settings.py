@@ -22,9 +22,18 @@ MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.7"))
 # 每个条目的 api_key 默认复用 MODEL_API_KEY 环境变量
 _DEFAULT_API_KEY = os.getenv("MODEL_API_KEY", "")
 
+
 MODEL_FALLBACK_CHAIN: list[dict] = [
-    # 1. Qwen2.5-72B: 阿里最强开源模型 (ModelScope 稳定支持)
-    # ZhipuAI/GLM-4.7-Flash
+    # 3. Qwen3 Coder (最新代码模型)
+    {
+        "model": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+        "base_url": "https://api-inference.modelscope.cn/v1",
+        "api_key": _DEFAULT_API_KEY,
+        "family": "qwen",
+        "function_calling": True,
+        "json_output": True,
+    },
+    # 4. GLM-4.7-Flash (速度快)
     {
         "model": "ZhipuAI/GLM-4.7-Flash",
         "base_url": "https://api-inference.modelscope.cn/v1",
@@ -33,47 +42,21 @@ MODEL_FALLBACK_CHAIN: list[dict] = [
         "function_calling": True,
         "json_output": True,
     },
+    # 5. DeepSeek R1 Distill Qwen 32B (均衡)
     {
-        "model": "Qwen/Qwen2.5-72B-Instruct",
+        "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
         "base_url": "https://api-inference.modelscope.cn/v1",
         "api_key": _DEFAULT_API_KEY,
-        "family": "qwen2.5",
+        "family": "deepseek",
         "function_calling": True,
         "json_output": True,
     },
-    # 2. Qwen2.5-Coder-32B: 专精代码生成
+    # 6. QwQ-32B (推理能力强)
     {
-        "model": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "model": "Qwen/QwQ-32B",
         "base_url": "https://api-inference.modelscope.cn/v1",
         "api_key": _DEFAULT_API_KEY,
-        "family": "qwen2.5",
-        "function_calling": True,
-        "json_output": True,
-    },
-    # 3. Qwen2.5-32B: 均衡型中等模型
-    {
-        "model": "Qwen/Qwen2.5-32B-Instruct",
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "api_key": _DEFAULT_API_KEY,
-        "family": "qwen2.5",
-        "function_calling": True,
-        "json_output": True,
-    },
-    # 4. Qwen2.5-14B: 最后的兜底
-    {
-        "model": "Qwen/Qwen2.5-14B-Instruct",
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "api_key": _DEFAULT_API_KEY,
-        "family": "qwen2.5",
-        "function_calling": True,
-        "json_output": True,
-    },
-    # 5. Qwen2.5-7B: 极速/极低成本兜底
-    {
-        "model": "Qwen/Qwen2.5-7B-Instruct",
-        "base_url": "https://api-inference.modelscope.cn/v1",
-        "api_key": _DEFAULT_API_KEY,
-        "family": "qwen2.5",
+        "family": "qwen",
         "function_calling": True,
         "json_output": True,
     },
